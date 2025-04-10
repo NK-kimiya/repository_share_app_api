@@ -1,0 +1,182 @@
+from tokenize import tokenize
+
+from rest_framework import viewsets
+from rest_framework import generics, permissions
+from transformers import BertForSequenceClassification
+
+from .serializers import UserSerializer,RoomSerializer,RoomFilterSerializer,CategorySerializer,CategoryFilterSerializer,RepositorySerializer,RepositoryFilterSerializer,GitProjectSerializer,MessageSelializer
+from rest_framework.permissions import AllowAny
+from .models import Room,Category,Repository,GitProject,Message
+from django.contrib.auth.hashers import check_password
+from rest_framework.response import Response
+from rest_framework import views, status
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+
+#自然言語機能
+from rest_framework.decorators import api_view,permission_classes
+from rest_framework.response import Response
+from rest_framework import status
+from .classifier import TextClassifier
+
+
+# 初期化はアプリ起動時に一度だけ
+classifier = TextClassifier()
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def predict_category(request):
+    try:
+        # リクエストボディからtext取得
+        text = request.data.get('text')
+
+        if not text:
+            return Response({'error': 'テキストが未入力です。'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # モデルで予測
+        predicted_category, predicted_probability = classifier.predict_category(text)
+
+        # 結果をJSONで返す
+        return Response({
+            'category': predicted_category,
+            'probability': predicted_probability
+        })
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# Create your views here.
+class CreateUserView(generics.CreateAPIView):
+    serializer_class = UserSerializer
+    permission_classes = (AllowAny,)
+
+class CreateRoomView(generics.CreateAPIView):
+    serializer_class = RoomSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+
+class RoomPasswordFilterView(views.APIView):
+    """パスワードでルームを検索する API"""
+
+    def post(self, request, *args, **kwargs):
+        serializer = RoomFilterSerializer(data=request.data)
+        if serializer.is_valid():
+            password = serializer.validated_data['password']  # パスワードを取得
+
+            # すべてのルームを取得し、パスワードが一致するものを探す
+            matching_rooms = []
+            for room in Room.objects.all():
+                if check_password(password, room.password):  # パスワードが一致するか確認
+                    matching_rooms.append(room)
+
+            # 一致するルームをシリアライズしてレスポンス
+            if matching_rooms:
+                return Response(RoomSerializer(matching_rooms, many=True).data, status=status.HTTP_200_OK)
+            else:
+                return Response({"detail": "No matching rooms found."}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class CreateCategoryView(generics.CreateAPIView):
+    """カテゴリ作成API"""
+    serializer_class = CategorySerializer
+
+
+class CategoryFilterView(views.APIView):
+    """ルームIDでカテゴリをフィルタリングするAPI"""
+    def post(self, request, *args, **kwargs):
+        serializer = CategoryFilterSerializer(data=request.data)
+        if serializer.is_valid():
+            room_id = serializer.validated_data['room_id']
+            categories = Category.objects.filter(room_id=room_id)
+            if not categories.exists():
+                return Response({"detail": "No categories found for this room."}, status=status.HTTP_404_NOT_FOUND)
+
+            return Response(CategorySerializer(categories, many=True).data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class CreateRepositoryView(generics.CreateAPIView):
+    """リポジトリ作成 API"""
+    serializer_class = RepositorySerializer
+
+    def perform_create(self, serializer):
+        """リポジトリ作成時に `owner` をログインユーザーに設定"""
+        serializer.save(owner=self.request.user)
+
+
+class RepositoryFilterView(views.APIView):
+    """Room ID でリポジトリをフィルタリングする API"""
+    def post(self, request, *args, **kwargs):
+        serializer = RepositoryFilterSerializer(data=request.data)
+        if serializer.is_valid():
+            room_id = serializer.validated_data['room_id']
+            repositories = Repository.objects.filter(room_id=room_id)
+            if not repositories.exists():
+                return Response({"detail": "No repositories found for this room."}, status=status.HTTP_404_NOT_FOUND)
+
+            return Response(RepositorySerializer(repositories, many=True).data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class GitProjectSearchView(APIView):
+    """
+    GitProject を title で検索する専用のView（POSTリクエスト、認証不要）
+    """
+    permission_classes = (AllowAny,)  # 認証不要
+
+    def post(self, request):
+        # POSTなので request.data を使用
+        title_query = request.data.get('title', None)
+
+        # titleが未入力の場合
+        if not title_query:
+            return Response({"error": "title パラメータを指定してください。"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # カテゴリ分類の予測（モデルが既にある前提）
+        predicted_category, predicted_probability = classifier.predict_category(title_query)
+        print("分類結果：" + predicted_category)
+
+        # GitProject をタイトルで部分一致検索
+        projects = GitProject.objects.filter(title__icontains=title_query)
+
+        # 検索結果をシリアライズ
+        serializer = GitProjectSerializer(projects, many=True)
+
+        # レスポンスにまとめる
+        response_data = {
+            "predicted_category": predicted_category,
+            "predicted_probability": predicted_probability,
+            "projects": serializer.data
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    #MessageモデルのAPI
+
+class MessageCreateAPIView(generics.CreateAPIView):
+    queryset = Message.objects.all()
+    serializer_class = MessageSelializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+class RepositoryMessageListAPIView(generics.ListAPIView):
+    serializer_class = MessageSelializer
+
+    def get_queryset(self):
+        repository_id = self.kwargs['repository_id']
+        return Message.objects.filter(repository__id=repository_id)
+
+class CurrentUserAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        return Response({
+            'id': str(user.id),
+            'username': user.username,
+            'email': user.email,
+        })
+
