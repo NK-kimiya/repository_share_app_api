@@ -19,6 +19,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from .classifier import TextClassifier
 
+import requests
+
 
 # 初期化はアプリ起動時に一度だけ
 classifier = TextClassifier()
@@ -109,15 +111,38 @@ class CreateRepositoryView(generics.CreateAPIView):
 class RepositoryFilterView(views.APIView):
     """Room ID でリポジトリをフィルタリングする API"""
     def post(self, request, *args, **kwargs):
-        serializer = RepositoryFilterSerializer(data=request.data)
+        serializer = RepositoryFilterSerializer(data=request.data)#React などのクライアントから送られた JSON データ（room_id）をバリデーション
         if serializer.is_valid():
             room_id = serializer.validated_data['room_id']
-            repositories = Repository.objects.filter(room_id=room_id)
-            if not repositories.exists():
-                return Response({"detail": "No repositories found for this room."}, status=status.HTTP_404_NOT_FOUND)
+            repositories = Repository.objects.filter(room_id=room_id)#room_id に一致する Repository モデルのオブジェクトを Django ORM で取得
+            serialized_data = RepositorySerializer(repositories, many=True).data#RepositorySerializer を使って、DBオブジェクト → JSON形式に変換
 
-            return Response(RepositorySerializer(repositories, many=True).data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            # UUID を文字列にして抽出
+            repository_ids = [str(repo['id']) for repo in serialized_data]#Repository の id を UUID → 文字列 にして抽出
+            username = request.user.username if request.user.is_authenticated else 'anonymous'#ログイン済みのユーザーなら username を取得
+            print("リクエストユーザーは" + username)
+
+            # Node.jsへPOST
+            read_count_response = requests.post(#Node.js の /read_count_filter に repository_ids + username を送信
+                'http://localhost:4000/read_count_filter',
+                json={'repository_ids': repository_ids, 'username': username},
+                timeout=5
+            )
+
+            #Node.jsから返ってきたデータを辞書に変換
+            read_count_map = {}
+            if read_count_response.status_code == 200:
+                for item in read_count_response.json().get("data", []):
+                    read_count_map[item["roomId"]] = item["readCount"]
+
+            #各 repo の id に対応する readCount を追加
+            for repo in serialized_data:
+                repo_id = str(repo["id"])
+                print("書き換える値は"+str(read_count_map.get(repo_id, 0)))
+                repo["readCount"] = read_count_map.get(repo_id, 0)
+
+            # レスポンスとして返す
+            return Response(serialized_data, status=status.HTTP_200_OK)
 
 class GitProjectSearchView(APIView):
     """
