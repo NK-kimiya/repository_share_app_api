@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django stuff:
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+db.sqlite3
+db.sqlite3-journal
+media
+*.sqlite3
+
+# If you are using Django's default static file setup
+staticfiles/
+
+# Django migrations
+**/migrations/
+!**/migrations/__init__.py
+
+# Environment variables and secrets
+.env
+.env.*
+
+# VSCode
+.vscode/
+
+# Virtual environment
+venv/
+ENV/
+env/
+.venv/
+.ENV/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# pytest
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+
+# coverage reports
+htmlcov/
+.coverage
+.tox/
+coverage.xml
+nosetests.xml
+*.cover
+*.py,cover
+
+# pipenv
+Pipfile.lock
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# pyre
+.pyre/
