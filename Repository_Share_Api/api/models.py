@@ -94,3 +94,15 @@ class Message(models.Model):
     def __str__(self):
         return f"Message to {self.repository.title}: {self.content[:20]}"
 
+#リポジトリのお気に入りのモデル
+class FavoriteRepository(models.Model):
+    id = models.UUIDField(default=uuid.uuid4, primary_key=True, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="favorite_repositories")
+    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="favorited_by")
+
+    class Meta:
+        unique_together = ('user', 'repository')  # 同じユーザーが同じリポジトリを複数回お気に入りできないように
+
+    def __str__(self):
+        return f"{self.user.email} likes {self.repository.title}"
+

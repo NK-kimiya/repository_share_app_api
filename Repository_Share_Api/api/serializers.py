@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import User,Room,Category,Repository,GitProject,Message
+from .models import User,Room,Category,Repository,GitProject,Message,FavoriteRepository
 
 class UserSerializer(serializers.ModelSerializer):
 
@@ -94,5 +94,12 @@ class MessageSelializer(serializers.ModelSerializer):
         model = Message
         fields = ['id','content','repository','created_at','user_name']
         read_only_fields = ['id','created_at','user_name']
+
+#お気に入りのモデル用のシリアライザー
+class FavoriteRepositorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FavoriteRepository
+        fields = ['id', 'repository']
+        read_only_fields = ['id']  # userはビューでセットする
 
 

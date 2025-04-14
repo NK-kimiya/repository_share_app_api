@@ -4,9 +4,9 @@ from rest_framework import viewsets
 from rest_framework import generics, permissions
 from transformers import BertForSequenceClassification
 
-from .serializers import UserSerializer,RoomSerializer,RoomFilterSerializer,CategorySerializer,CategoryFilterSerializer,RepositorySerializer,RepositoryFilterSerializer,GitProjectSerializer,MessageSelializer
+from .serializers import UserSerializer,RoomSerializer,RoomFilterSerializer,CategorySerializer,CategoryFilterSerializer,RepositorySerializer,RepositoryFilterSerializer,GitProjectSerializer,MessageSelializer,FavoriteRepositorySerializer
 from rest_framework.permissions import AllowAny
-from .models import Room,Category,Repository,GitProject,Message
+from .models import Room,Category,Repository,GitProject,Message,FavoriteRepository
 from django.contrib.auth.hashers import check_password
 from rest_framework.response import Response
 from rest_framework import views, status
@@ -118,7 +118,7 @@ class RepositoryFilterView(views.APIView):
             room_id = serializer.validated_data['room_id']
             repositories = Repository.objects.filter(room_id=room_id)#room_id に一致する Repository モデルのオブジェクトを Django ORM で取得
             serialized_data = RepositorySerializer(repositories, many=True).data#RepositorySerializer を使って、DBオブジェクト → JSON形式に変換
-
+            serialized_data = attach_favorite_flags(serialized_data, request.user)
             # UUID を文字列にして抽出
             repository_ids = [str(repo['id']) for repo in serialized_data]#Repository の id を UUID → 文字列 にして抽出
             username = request.user.username if request.user.is_authenticated else 'anonymous'#ログイン済みのユーザーなら username を取得
@@ -240,6 +240,7 @@ class RepositoryReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
 
         # Django → JSON
         serialized_data = self.get_serializer(queryset, many=True).data
+        serialized_data = attach_favorite_flags(serialized_data, request.user)
         # 1. RepositoryのUUIDをstr化
         repository_ids = [str(repo["id"]) for repo in serialized_data]
         # 2. ユーザー名の取得
@@ -267,3 +268,93 @@ class RepositoryReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
         print("----- フィルタ終了 -----")
 
         return Response(serialized_data)
+
+#お気に入りモデルにデータの作成
+class FavoriteRepositoryCreateView(generics.CreateAPIView):
+    serializer_class = FavoriteRepositorySerializer
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+#ログインユーザーにお気に入りのリポジトリをレスポンス
+class FavoriteRepositoryListView(generics.ListAPIView):
+    serializer_class = FavoriteRepositorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        # 1. ユーザーのお気に入りを取得
+        favorites = FavoriteRepository.objects.filter(user=request.user)
+
+        # 2. Repositoryだけを取り出す
+        repositories = [fav.repository for fav in favorites]
+
+        # 3. Repositoryをシリアライズ
+        serialized_data = RepositorySerializer(repositories, many=True).data
+
+        # 4. IDを抽出してNode.jsに送信
+        repository_ids = [str(repo['id']) for repo in serialized_data]
+        username = request.user.username if request.user.is_authenticated else 'anonymous'
+
+        read_count_map = {}
+        try:
+            read_count_response = requests.post(
+                'http://localhost:4000/read_count_filter',
+                json={'repository_ids': repository_ids, 'username': username},
+                timeout=5
+            )
+            if read_count_response.status_code == 200:
+                for item in read_count_response.json().get("data", []):
+                    read_count_map[item["roomId"]] = item["readCount"]
+        except requests.RequestException as e:
+            print("Node.js連携エラー:", e)
+
+        # 5. readCountを追記
+        for repo in serialized_data:
+            repo["favorite"] = True
+            repo_id = str(repo["id"])
+            repo["readCount"] = read_count_map.get(repo_id, 0)
+
+        # 6. 最終レスポンス
+        return Response(serialized_data, status=status.HTTP_200_OK)
+
+ #リポジトリがお気に入りに追加されているかの判定の共通ロジック
+def attach_favorite_flags(serialized_data, user):
+    if not user.is_authenticated:#ユーザーが未ログインの場合
+
+        #辞書のリストの各辞書にfavoriteキーとFalseの値を追加
+        for repo in serialized_data:
+            repo["favorite"] = False
+        return serialized_data
+
+    # ユーザーがお気に入り登録しているRepositoryのID一覧
+    favorite_ids = set(
+        str(repo_id)  # ← ここでUUIDを文字列に変換
+        for repo_id in FavoriteRepository.objects.filter(user=user)
+        .values_list("repository_id", flat=True)
+    )
+
+    # 各リポジトリにfavoriteフラグを追加
+    for repo in serialized_data:#辞書配列の各辞書のidをfavorite_idsに含まれているかを確認
+        repo["favorite"] = str(repo["id"]) in favorite_ids#含まれていれば favorite: True、なければ False を追加
+
+    return serialized_data
+
+
+#お気に入りデータの解除
+class FavoriteRepositoryDeleteView(APIView):
+    def delete(self, request, *args, **kwargs):
+        user = request.user
+        repository_id = request.data.get('repository')
+
+        if not repository_id:
+            return Response({"error": "repository ID is required"}, status=400)
+
+        deleted_count, _ = FavoriteRepository.objects.filter(
+            user=user,
+            repository_id=repository_id
+        ).delete()
+
+        if deleted_count == 0:
+            return Response({"message": "お気に入りは登録されていませんでした"}, status=404)
+
+        return Response({"message": "お気に入りを解除しました"}, status=200)
