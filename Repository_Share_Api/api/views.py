@@ -20,6 +20,8 @@ from rest_framework import status
 from .classifier import TextClassifier
 
 import requests
+import uuid
+from rest_framework.decorators import action
 
 
 # 初期化はアプリ起動時に一度だけ
@@ -205,3 +207,63 @@ class CurrentUserAPIView(APIView):
             'email': user.email,
         })
 
+#リポジトリーのカテゴリー検索
+class RepositoryReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Repository.objects.all()
+    serializer_class = RepositorySerializer
+
+    @action(detail=False, methods=["get"])
+    def filter_by_categories(self, request):
+        category_ids = request.query_params.getlist("category")
+        room_id_str = request.query_params.get("room")
+
+        print("----- フィルタ開始 -----")
+        print("リクエストされたカテゴリID一覧:", category_ids)
+        print("リクエストされたルームID:", room_id_str)
+
+        if not category_ids or not room_id_str:
+            print("カテゴリまたはルームが指定されていません。")
+            return Response([])
+
+        try:
+            room_id = uuid.UUID(room_id_str)
+        except ValueError:
+            print("room_idの形式が不正です")
+            return Response({"error": "room_idの形式がUUIDではありません"}, status=400)
+
+        queryset = Repository.objects.filter(
+            categories__id__in=category_ids,
+            room__id=room_id
+        ).distinct()
+
+        print("フィルタ後のクエリセット件数:", queryset.count())
+
+        # Django → JSON
+        serialized_data = self.get_serializer(queryset, many=True).data
+        # 1. RepositoryのUUIDをstr化
+        repository_ids = [str(repo["id"]) for repo in serialized_data]
+        # 2. ユーザー名の取得
+        username = request.user.username if request.user.is_authenticated else "anonymous"
+
+        # 3. Node.jsへPOSTしてreadCountを取得
+        read_count_map = {}
+        try:
+            response = requests.post(
+                "http://localhost:4000/read_count_filter",
+                json={"repository_ids": repository_ids, "username": username},
+                timeout=5
+            )
+            if response.status_code == 200:
+                for item in response.json().get("data", []):
+                    read_count_map[item["roomId"]] = item["readCount"]
+        except requests.RequestException as e:
+            print("Node.js連携エラー:", e)
+
+        # 4. readCountをserialized_dataに付加
+        for repo in serialized_data:
+            repo_id = str(repo["id"])
+            repo["readCount"] = read_count_map.get(repo_id, 0)
+
+        print("----- フィルタ終了 -----")
+
+        return Response(serialized_data)

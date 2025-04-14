@@ -2,8 +2,9 @@ from rest_framework import routers
 from django.urls import path
 from django.conf.urls import include
 from .views import CreateUserView,MessageCreateAPIView,RepositoryMessageListAPIView
-from .views import CreateRoomView,RoomPasswordFilterView,CreateCategoryView,CategoryFilterView,CreateRepositoryView,RepositoryFilterView,predict_category,GitProjectSearchView,CurrentUserAPIView
+from .views import CreateRoomView,RoomPasswordFilterView,CreateCategoryView,CategoryFilterView,CreateRepositoryView,RepositoryFilterView,predict_category,GitProjectSearchView,CurrentUserAPIView,RepositoryReadOnlyViewSet
 router = routers.DefaultRouter()
+router.register(r'repositories-categorie-filter', RepositoryReadOnlyViewSet, basename='repository')
 
 
 urlpatterns = [
