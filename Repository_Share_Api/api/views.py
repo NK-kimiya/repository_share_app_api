@@ -67,20 +67,20 @@ class RoomPasswordFilterView(views.APIView):
     def post(self, request, *args, **kwargs):
         serializer = RoomFilterSerializer(data=request.data)
         if serializer.is_valid():
-            password = serializer.validated_data['password']  # パスワードを取得
+            name = serializer.validated_data.get('name')
+            password = serializer.validated_data.get('password')
 
-            # すべてのルームを取得し、パスワードが一致するものを探す
-            matching_rooms = []
-            for room in Room.objects.all():
-                if check_password(password, room.password):  # パスワードが一致するか確認
-                    matching_rooms.append(room)
+            print(f"受信したname: {name}, password: {password}")
 
-            # 一致するルームをシリアライズしてレスポンス
-            if matching_rooms:
-                return Response(RoomSerializer(matching_rooms, many=True).data, status=status.HTTP_200_OK)
+            try:
+                room = Room.objects.get(name=name)
+            except Room.DoesNotExist:
+                return Response({"detail": "指定されたルームは存在しません。"}, status=status.HTTP_404_NOT_FOUND)
+
+            if room.check_password(password):
+                return Response(RoomSerializer(room).data, status=status.HTTP_200_OK)
             else:
-                return Response({"detail": "No matching rooms found."}, status=status.HTTP_404_NOT_FOUND)
-
+                return Response({"detail": "パスワードが正しくありません。"}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class CreateCategoryView(generics.CreateAPIView):
@@ -89,6 +89,7 @@ class CreateCategoryView(generics.CreateAPIView):
 
 
 class CategoryFilterView(views.APIView):
+    print("カテゴリーフィルターを開始")
     """ルームIDでカテゴリをフィルタリングするAPI"""
     def post(self, request, *args, **kwargs):
         serializer = CategoryFilterSerializer(data=request.data)

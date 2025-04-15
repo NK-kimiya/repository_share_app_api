@@ -47,6 +47,7 @@ class RoomSerializer(serializers.ModelSerializer):
 
 class RoomFilterSerializer(serializers.Serializer):
     """パスワードでルームを検索するためのシリアライザー"""
+    name = serializers.CharField(required=True)
     password = serializers.CharField(write_only=True)
 
 class CategorySerializer(serializers.ModelSerializer):
