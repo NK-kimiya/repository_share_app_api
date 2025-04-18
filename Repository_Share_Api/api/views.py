@@ -166,7 +166,7 @@ class GitProjectSearchView(APIView):
         print("分類結果：" + predicted_category)
 
         # GitProject をタイトルで部分一致検索
-        projects = GitProject.objects.filter(title__icontains=title_query)
+        projects = GitProject.objects.filter(title__icontains=predicted_category)
 
         # 検索結果をシリアライズ
         serializer = GitProjectSerializer(projects, many=True)

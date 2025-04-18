@@ -51,7 +51,7 @@ class Repository(models.Model):
     url = models.URLField()
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    demo_video = models.FileField(blank=False, upload_to=load_path_video)
+    demo_video = models.FileField(blank=True, null=True, upload_to=load_path_video)
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="repositories")
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="repositories")
     categories = models.ManyToManyField("Category", related_name="repositories")
