@@ -1,4 +1,8 @@
-# 制作物：CodeBridge（コードブリッジ）
+# 制作物：CodeBridge（コードブリッジ)　
+
+デモの紹介サイト　
+
+https://kimikou-blog.jp/portfolio/
 
 ## 🎯 目的・背景
 
