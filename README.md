@@ -67,9 +67,9 @@
 
 ・動作を確認した環境　
 
-Python 3.11.3　
+Python → v3.11.3　
 
-pip 22.3.1　
+pip → v22.3.1　
 
 
 ---
@@ -111,6 +111,14 @@ python manage.py runserver
 アクセスURL（デフォルト）:
 👉 http://127.0.0.1:8000/admin
 
+## 🔗 関連リポジトリ
+
+このDjango（バックエンドAPI）とは別に、以下の関連リポジトリも公開しています：
+
+- 🌐 フロントエンド（React）
+  - [https://github.com/NK-kimiya/repository_share_app_front](https://github.com/NK-kimiya/repository_share_app_front.git)
+- 🔌 リアルタイムサーバー（Express + Socket.io）
+  - [https://github.com/NK-kimiya/repository_share_app_socket](https://github.com/NK-kimiya/repository_share_app_socket.git)
 
 
 
