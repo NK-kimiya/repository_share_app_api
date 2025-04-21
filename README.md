@@ -83,32 +83,48 @@ pip → v22.3.1　
 ```bash
 git clone https://github.com/NK-kimiya/repository_share_app_api.git
 cd repository_share_app_api
+```
 
 ### 2. 仮想環境を作成
+```
 python -m venv venv
+```
 
 ### 3. 仮想環境を有効化
+
+```
 ・Windows
 venv\Scripts\activate　
 
 ・Mac / Linux
 source venv/bin/activate
+```
 
 ### 4.必要なパッケージをインストール
+```
 pip install -r requirements.txt
+```
 
 ### 5.マイグレーションを実行
+```
 ・manage.py があるディレクトリへ移動
 cd Repository_Share_Api
+```
 
 ・モデル定義のマイグレーションファイルを作成
+```
 python manage.py makemigrations api
+```
 
 ・実際にデータベースに反映
+```
 python manage.py migrate
+```
 
 ### 6.スーパーユーザーを作成（任意のメールアドレスとパスワードを入力）
+```
 python manage.py createsuperuser
+```
 
 ### 7. モデルのパスを変更
 
@@ -125,6 +141,7 @@ model_dir = Path(
 
 
 ### 8.サーバーを起動（ポート8000を使用）
+```
 python manage.py runserver
 アクセスURL（デフォルト）:
 👉 http://127.0.0.1:8000/admin
