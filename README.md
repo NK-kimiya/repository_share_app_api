@@ -119,6 +119,7 @@ python manage.py createsuperuser
 model_dir = Path(
     r'your_model_directory_path_here\Repository_Share_API\Repository_Share_Api\api\model_transformers'
 ).as_posix()
+```
 
 
 
