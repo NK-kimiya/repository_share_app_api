@@ -11,11 +11,11 @@ class TextClassifier:
 
         # スラッシュパス & local_files_only を併用
         model_dir = Path(
-            r'C:\Users\kinar\Desktop\Repository_Share_API\Repository_Share_Api\api\model_transformers').as_posix()
+            r'your_model_directory_path_her\Repository_Share_API\Repository_Share_Api\api\model_transformerse').as_posix()
 
         self.model = BertForSequenceClassification.from_pretrained(
             model_dir,
-            local_files_only=True  # ← これが決定打！
+            local_files_only=True 
         )
 
         self.model.eval()
