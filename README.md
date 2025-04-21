@@ -110,13 +110,20 @@ python manage.py migrate
 ### 6.スーパーユーザーを作成（任意のメールアドレスとパスワードを入力）
 python manage.py createsuperuser
 
-### 7.モデルのパスを変更
+### 7. モデルのパスを変更
 
-classifier.pyで下記のパスの''your_model_directory_path_here'の部分を自身のローカル環境で Repository_Share_APIフォルダが存在するルートパスに置き換えて下さい。
+`classifier.py` の以下のコードにある `'your_model_directory_path_here'` の部分を、  
+**あなたのローカル環境で `Repository_Share_API` フォルダが存在するルートパス**に置き換えてください。
+
+```python
+model_dir = Path(
+    r'your_model_directory_path_here\Repository_Share_API\Repository_Share_Api\api\model_transformers'
+).as_posix()
 
 
 
-### 7.サーバーを起動（ポート8000を使用）
+
+### 8.サーバーを起動（ポート8000を使用）
 python manage.py runserver
 アクセスURL（デフォルト）:
 👉 http://127.0.0.1:8000/admin
